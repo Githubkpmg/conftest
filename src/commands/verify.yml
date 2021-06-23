@@ -1,0 +1,24 @@
+description: Verify Rego unit tests
+
+parameters:
+  namespace:
+    description: Namespace in which to find deny and warn rules.
+    type: string
+    default: main
+  policy_path:
+    description: Path to the Rego policy files directory. For the test command, specifying a specific .rego file is allowed.
+    type: string
+    default: policy
+  output_type:
+    description: Output format for conftest results.(valid options are stdout, json, tap)
+    type: enum
+    enum: ['stdout', 'json', 'tap']
+    default: 'stdout'
+
+steps:
+  - run:
+      name: Run conftest verify
+      command: |
+        conftest verify --namespace << parameters.namespace >> \
+          --policy << parameters.policy_path >> \
+          --output << parameters.output_type >>
