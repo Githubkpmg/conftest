@@ -1,0 +1,37 @@
+description: Install conftest
+
+parameters:
+  version:
+    description: The version of conftest to install
+    type: string
+    default: latest
+
+steps:
+  - run:
+      name: Download the CLI
+      # TODO: make it multiarch aware
+      command: |
+        if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+        # grab conftest version
+        if [[ "<<parameters.version>>" == "latest" ]]; then
+          # extract latest version from GitHub releases API
+          CONFTEST_VERSION=$(curl \
+            --silent --show-error --location --fail --retry 3 \
+            https://api.github.com/repos/instrumenta/conftest/releases/latest | \
+            jq '.tag_name' | sed -E 's/"//g' | sed -E 's/^v//g')
+        else
+          CONFTEST_VERSION=<<parameters.version>>
+          echo "Selected version of Conftest is $CONFTEST_VERSION"
+        fi
+        # Install conftest
+        if [ ! -f ${HOME}/.conftest/bin/conftest ]; then
+          mkdir -p ${HOME}/.conftest/bin
+          wget "https://github.com/instrumenta/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          tar xzf "conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          mv conftest ${HOME}/.conftest/bin
+          chmod +x ${HOME}/.conftest/bin/conftest
+          # Add to PATH
+          echo 'export PATH=${HOME}/.conftest/bin:$PATH' >> $BASH_ENV
+          source $BASH_ENV
+        fi
+        conftest --version
