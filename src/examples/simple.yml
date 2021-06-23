@@ -11,4 +11,4 @@ usage:
             pre-steps:
               - checkout
             file: config_to_test.yaml
-© 2021 GitHub, Inc.
+
