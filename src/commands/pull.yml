@@ -1,0 +1,16 @@
+description: Download individual policies from an OCI registry.
+
+parameters:
+  policy_path:
+    description: Path to the Rego policy files directory. For the test command, specifying a specific .rego file is allowed.
+    type: string
+    default: policy
+  repository:
+    description: Repository to pull policies from.
+    type: string
+
+steps:
+  - run:
+      name: Run conftest pull << parameters.repository >>
+      command: |
+        conftest pull --policy << parameters.policy_path >> << parameters.repository >>
