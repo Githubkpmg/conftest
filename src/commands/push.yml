@@ -1,0 +1,16 @@
+description: Upload individual policies to an OCI registry
+
+parameters:
+  repository:
+    description: Repository to push policies to.
+    type: string
+  path:
+    description: Path to create the bundle from.
+    type: string
+    default: '.'
+
+steps:
+  - run:
+      name: Run conftest push << parameters.repository >>
+      command: |
+        conftest push << parameters.repository >> << parameters.path >>
