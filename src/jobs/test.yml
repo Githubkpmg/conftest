@@ -1,0 +1,38 @@
+description: Run conftest test
+
+parameters:
+  version:
+    description: Version of conftest to use.
+    type: string
+    default: latest
+  policy_path:
+    description: Path to the Rego policy files directory.
+    type: string
+    default: policy
+  repository:
+    description: Repository to pull policies from. If specified, will pull policies to the `policy_path` before executing the test.
+    type: string
+    default: ''
+  fail_on_warn:
+    description: Return a non-zero exit code when warnings are found.
+    type: boolean
+    default: false
+  file:
+    description: File(s) to test against.
+    type: string
+
+executor: default
+
+steps:
+  - install:
+      version: << parameters.version >>
+  - when:
+      condition: << parameters.repository >>
+      steps:
+        - pull:
+            policy_path: << parameters.policy_path >>
+            repository: << parameters.repository >>
+  - test:
+      policy_path: << parameters.policy_path >>
+      fail_on_warn: << parameters.fail_on_warn >>
+      file: << parameters.file >>
