@@ -1,0 +1,194 @@
+version: 2.1
+
+orbs:
+  orb-tools: circleci/orb-tools@8.27.4
+  # This is used for the integration tests
+  circleci-cli: circleci/circleci-cli@0.1.5
+  # add your orb below, to be used in integration tests (note: a
+  # @dev:alpha release must exist; if none exists, you'll need to
+  # publish manually once before this worklow can succeed)
+  conftest: kenfdev/conftest-orb@dev:alpha
+
+alias:
+  integration-dev_filters: &integration-dev_filters
+    branches:
+      ignore: /.*/
+    tags:
+      only: /integration-.*/
+
+  integration-master_filters: &integration-master_filters
+    branches:
+      ignore: /.*/
+    tags:
+      only: /master-.*/
+
+  prod-deploy_requires:
+    &prod-deploy_requires [push_pull_test_master, general_usecase_test_master]
+
+commands:
+  start_oci_registry:
+    parameters:
+      image:
+        description: The image of the OCI registry
+        type: string
+        default: registry:2
+    steps:
+      - run:
+          name: Dockerhub login
+          command: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run:
+          name: Run docker registry
+          command: docker run -d --rm -p 5000:5000 --name registry << parameters.image >>
+
+executors:
+  machine:
+    machine:
+      image: ubuntu-1604:201903-01
+
+jobs:
+  push_pull_test:
+    executor: machine
+    steps:
+      - start_oci_registry
+      - checkout
+      - conftest/install
+      - run:
+          name: Create a fake policy to push
+          command: |
+            mkdir /tmp/policy
+            touch /tmp/policy/base.rego
+      - conftest/push:
+          path: /tmp/policy
+          repository: 127.0.0.1:5000/policies:latest
+      - conftest/pull:
+          policy_path: /tmp/policy
+          repository: 127.0.0.1:5000/policies:latest
+  general_usecase_test:
+    executor: machine
+    steps:
+      - checkout
+      - circleci-cli/install
+      - run:
+          name: Pack the orb.yml
+          command: circleci config pack src > orb.yml
+      - conftest/install
+      - start_oci_registry:
+          image: kenfdev/circleci-orbs-policies
+      - conftest/pull:
+          policy_path: policy
+          repository: 127.0.0.1:5000/policies:latest
+      - conftest/verify:
+          policy_path: policy
+      # test with minimum options
+      - conftest/test:
+          policy_path: policy
+          file: orb.yml
+      # test with full options
+      - conftest/test:
+          policy_path: policy
+          fail_on_warn: true
+          input_type: yaml
+          output_type: json
+          file: orb.yml
+
+workflows:
+  lint_pack-validate_publish-dev:
+    jobs:
+      # this `lint-pack_validate_publish-dev` workflow will run on any commit
+      - orb-tools/lint
+
+      # pack your orb YAML files to a single orb.yml
+      # validate the orb.yml file to ensure it is well-formed
+      - orb-tools/pack:
+          requires:
+            - orb-tools/lint
+
+      # release dev version of orb, for testing & possible publishing
+      # requires a CircleCI API token to be stored as CIRCLE_TOKEN (default)
+      # https://circleci.com/docs/2.0/managing-api-tokens
+      # store CIRCLE_TOKEN as a project env var or Contexts resource
+      # if using Contexts, add your context below
+      - orb-tools/publish-dev:
+          orb-name: kenfdev/conftest-orb
+          requires:
+            - orb-tools/pack
+
+      # trigger an integration workflow to test the dev version of your orb
+      # an SSH key must be stored in your orb's repository and in CircleCI
+      # (add the public key as a read/write key on GitHub; add the private
+      # key in CircleCI via SSH Permissions, with github.com as Hostname)
+      - orb-tools/trigger-integration-workflow:
+          name: trigger-integration-dev
+          ssh-fingerprints: 48:81:89:24:c9:2a:de:02:85:c2:f7:b0:7d:52:12:26
+          requires:
+            - orb-tools/publish-dev
+          filters:
+            branches:
+              ignore: master
+
+      # by default, the 1st job (above) will trigger only integration tests;
+      # the 2nd job (below) may also publish a production orb version
+      - orb-tools/trigger-integration-workflow:
+          name: trigger-integration-master
+          ssh-fingerprints: 48:81:89:24:c9:2a:de:02:85:c2:f7:b0:7d:52:12:26
+          tag: master
+          requires:
+            - orb-tools/publish-dev
+          filters:
+            branches:
+              only: master
+
+  # this `integration-tests_prod-release` workflow will ignore commits
+  # it is only triggered by git tags, which are created in the job above
+  integration-tests_prod-release:
+    jobs:
+      # triggered by non-master branch commits
+      - general_usecase_test:
+          name: general_usecase_test_dev
+          filters: *integration-dev_filters
+      - push_pull_test:
+          name: push_pull_test_dev
+          filters: *integration-dev_filters
+
+      # triggered by master branch commits
+      - general_usecase_test:
+          name: general_usecase_test_master
+          filters: *integration-master_filters
+      - push_pull_test:
+          name: push_pull_test_master
+          filters: *integration-master_filters
+
+      # patch, minor, or major publishing, depending on which orb source
+      # files have been modified (that logic lives in the
+      # trigger-integration-workflow job's source)
+      - orb-tools/dev-promote-prod:
+          name: dev-promote-patch
+          orb-name: kenfdev/conftest-orb
+          requires: *prod-deploy_requires
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /master-patch.*/
+
+      - orb-tools/dev-promote-prod:
+          name: dev-promote-minor
+          release: minor
+          orb-name: kenfdev/conftest-orb
+          requires: *prod-deploy_requires
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /master-minor.*/
+
+      - orb-tools/dev-promote-prod:
+          name: dev-promote-major
+          release: major
+          orb-name: kenfdev/conftest-orb
+          requires: *prod-deploy_requires
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /master-major.*/
