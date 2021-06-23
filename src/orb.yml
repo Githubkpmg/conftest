@@ -1,0 +1,5 @@
+version: 2.1
+
+description: >
+  Easily integrate Conftest
+  View this orb's source: https://github.com/kenfdev/conftest-orb
