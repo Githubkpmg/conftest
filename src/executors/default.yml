@@ -9,4 +9,4 @@ parameters:
       https://hub.docker.com/r/cibuilds/base/tags
 docker:
   - image: cibuilds/base:<< parameters.tag >>
-© 2021 GitHub, Inc.
+
