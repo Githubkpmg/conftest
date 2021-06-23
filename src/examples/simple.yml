@@ -1,0 +1,14 @@
+description: |
+  Runs conftest tests against the target file.
+usage:
+  version: 2.1
+  orbs:
+    conftest: kenfdev/conftest-orb@x.y
+  workflows:
+    build:
+      jobs:
+        - conftest/test:
+            pre-steps:
+              - checkout
+            file: config_to_test.yaml
+© 2021 GitHub, Inc.
