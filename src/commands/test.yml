@@ -1,0 +1,39 @@
+description: Test your configuration files using conftest
+
+parameters:
+  namespace:
+    description: Namespace in which to find deny and warn rules.
+    type: string
+    default: main
+  policy_path:
+    description: Path to the Rego policy files directory. For the test command, specifying a specific .rego file is allowed.
+    type: string
+    default: policy
+  fail_on_warn:
+    description: Return a non-zero exit code when warnings are found.
+    type: boolean
+    default: false
+  input_type:
+    description: Input type for given source, especially useful when using conftest with stdin.(valid options are toml, tf, hcl, cue, ini, yaml, json)
+    type: string
+    default: ''
+  output_type:
+    description: Output format for conftest results.(valid options are stdout, json, tap)
+    type: enum
+    enum: ['stdout', 'json', 'tap']
+    default: 'stdout'
+  file:
+    description: File(s) to test against.
+    type: string
+
+steps:
+  - run:
+      name: Run conftest test
+      command: |
+        conftest test --namespace << parameters.namespace >> \
+          --policy << parameters.policy_path >> \
+          <<# parameters.fail_on_warn >>--fail-on-warn<</ parameters.fail_on_warn >> \
+          <<# parameters.input_type >>--input << parameters.input_type >><</ parameters.input_type >> \
+          --output << parameters.output_type >> \
+          << parameters.file >>
+© 2021 GitHub, Inc.
